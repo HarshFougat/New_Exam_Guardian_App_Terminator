@@ -9,6 +9,7 @@ import time
 import threading
 from datetime import datetime
 import logging
+import psutil
 
 # Import our custom modules
 from monitor import get_monitor_instance
@@ -416,20 +417,38 @@ def handle_connect():
 
     # Send initial data
     try:
-        processes = monitor.get_running_processes()[:20]  # Top 20
+        all_processes = monitor.get_running_processes()[:25]
         ai_processes = monitor.get_ai_processes()
         tabs = monitor.get_browser_tabs()
-        system_info = monitor.get_system_info()
+        tab_summary = monitor.get_tab_summary()
+        
+        # Get system stats
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
 
         emit('initial_data', {
-            'processes': processes,
-            'ai_processes': ai_processes,
-            'browser_tabs': tabs,
-            'system_info': system_info,
-            'timestamp': time.time()
+            'processes': {
+                'all': all_processes,
+                'ai': ai_processes,
+                'count': len(all_processes)
+            },
+            'browser_tabs': {
+                'tabs': tabs,
+                'summary': tab_summary
+            },
+            'system_stats': {
+                'cpu_percent': cpu_percent,
+                'memory_percent': memory.percent,
+                'memory_used_gb': round(memory.used / (1024**3), 2),
+                'memory_total_gb': round(memory.total / (1024**3), 2)
+            },
+            'timestamp': time.time(),
+            'datetime': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
     except Exception as e:
         logger.error(f"Error sending initial data: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -495,13 +514,8 @@ def get_current_monitoring_data():
         current_demo_summary = monitor.get_tab_summary()
 
     # Basic system stats
-    try:
-        import psutil
-        cpu_percent = psutil.cpu_percent(interval=1)
-        memory = psutil.virtual_memory()
-    except ImportError:
-        cpu_percent = 0
-        memory = type('Memory', (), {'percent': 0, 'used': 0, 'total': 0})()
+    cpu_percent = psutil.cpu_percent(interval=1)
+    memory = psutil.virtual_memory()
 
     return {
         'processes': {
