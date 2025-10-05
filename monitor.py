@@ -4,9 +4,7 @@ Handles detection and monitoring of running processes and browser tabs
 """
 
 import psutil
-
 import platform
-
 import requests
 import time
 from typing import List, Dict

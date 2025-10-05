@@ -39,7 +39,9 @@ def check_dependencies():
     missing = []
     for module in required_modules:
         try:
-            __import__(module.replace('_', '-'))
+            # Handle module name variations
+            import_name = module.replace('-', '_')
+            __import__(import_name)
         except ImportError:
             missing.append(module)
 

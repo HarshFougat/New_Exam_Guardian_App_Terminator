@@ -303,9 +303,14 @@ class ProcessKiller:
             results['browser_tabs'] = tab_results
 
             # Determine overall success
+            total_browser_errors = 0
+            for browser_name, browser_data in tab_results.items():
+                if isinstance(browser_data, dict) and 'errors' in browser_data:
+                    total_browser_errors += len(browser_data.get('errors', []))
+            
             results['success'] = (
                 len(ai_results.get('failed', [])) == 0 and
-                sum(browser.get('errors', []) for browser in tab_results.values() if isinstance(browser, dict)) == 0
+                total_browser_errors == 0
             )
 
         except Exception as e:
