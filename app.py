@@ -27,7 +27,13 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-change-in-production'
 
 # Initialize SocketIO for real-time updates
-socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)
+socketio = SocketIO(app, 
+                    cors_allowed_origins="*", 
+                    async_mode='threading',
+                    ping_timeout=60,
+                    ping_interval=25,
+                    logger=True, 
+                    engineio_logger=False)
 
 # Global variables
 monitor = get_monitor_instance()
@@ -415,36 +421,11 @@ def handle_connect():
     logger.info(f"Client connected: {request.sid}")
     emit('connected', {'data': 'Connected to ExHon monitoring server'})
 
-    # Send initial data
+    # Send initial data immediately
     try:
-        all_processes = monitor.get_running_processes()[:25]
-        ai_processes = monitor.get_ai_processes()
-        tabs = monitor.get_browser_tabs()
-        tab_summary = monitor.get_tab_summary()
-        
-        # Get system stats
-        cpu_percent = psutil.cpu_percent(interval=1)
-        memory = psutil.virtual_memory()
-
-        emit('initial_data', {
-            'processes': {
-                'all': all_processes,
-                'ai': ai_processes,
-                'count': len(all_processes)
-            },
-            'browser_tabs': {
-                'tabs': tabs,
-                'summary': tab_summary
-            },
-            'system_stats': {
-                'cpu_percent': cpu_percent,
-                'memory_percent': memory.percent,
-                'memory_used_gb': round(memory.used / (1024**3), 2),
-                'memory_total_gb': round(memory.total / (1024**3), 2)
-            },
-            'timestamp': time.time(),
-            'datetime': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        })
+        data = get_current_monitoring_data()
+        emit('initial_data', data)
+        logger.info(f"Sent initial data to {request.sid}")
     except Exception as e:
         logger.error(f"Error sending initial data: {e}")
         import traceback
@@ -466,6 +447,9 @@ def handle_start_monitoring():
         update_thread.start()
         emit('monitoring_started', {'status': 'Monitoring started'})
         logger.info("Real-time monitoring started")
+    else:
+        logger.info("Monitoring already active")
+        emit('monitoring_started', {'status': 'Monitoring already active'})
 
 @socketio.on('stop_monitoring')
 def handle_stop_monitoring():
@@ -488,15 +472,19 @@ def handle_request_update():
 def monitoring_loop():
     """Background thread for real-time monitoring updates"""
     global monitoring_active
-
+    
+    logger.info("Monitoring loop started")
     while monitoring_active:
         try:
             data = get_current_monitoring_data()
-            socketio.emit('monitoring_update', data)
-            time.sleep(5)  # Update every 5 seconds
+            socketio.emit('monitoring_update', data, broadcast=True)
+            logger.debug(f"Sent monitoring update: {len(data.get('processes', {}).get('all', []))} processes")
+            time.sleep(3)  # Update every 3 seconds for more responsiveness
         except Exception as e:
             logger.error(f"Error in monitoring loop: {e}")
-            time.sleep(10)  # Wait longer on error
+            import traceback
+            logger.error(traceback.format_exc())
+            time.sleep(5)  # Wait on error
 
 def get_current_monitoring_data():
     """Get current monitoring data for real-time updates"""

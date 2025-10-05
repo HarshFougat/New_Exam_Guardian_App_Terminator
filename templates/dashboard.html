@@ -450,17 +450,16 @@
                                     "success",
                                 );
 
-                                // Force refresh data
+                                // Force multiple refreshes to ensure data updates
                                 setTimeout(() => {
-                                    if (
-                                        window.exhonDashboard &&
-                                        window.exhonDashboard.requestUpdate
-                                    ) {
+                                    if (window.exhonDashboard) {
                                         window.exhonDashboard.requestUpdate();
-                                    } else {
-                                        location.reload();
+                                        // Request again after a short delay
+                                        setTimeout(() => {
+                                            window.exhonDashboard.requestUpdate();
+                                        }, 500);
                                     }
-                                }, 1000);
+                                }, 300);
                             }
                         })
                         .catch((error) => {
@@ -483,17 +482,15 @@
 
                                 showAlert("✅ Demo mode disabled", "info");
 
-                                // Force refresh data
+                                // Force multiple refreshes
                                 setTimeout(() => {
-                                    if (
-                                        window.exhonDashboard &&
-                                        window.exhonDashboard.requestUpdate
-                                    ) {
+                                    if (window.exhonDashboard) {
                                         window.exhonDashboard.requestUpdate();
-                                    } else {
-                                        location.reload();
+                                        setTimeout(() => {
+                                            window.exhonDashboard.requestUpdate();
+                                        }, 500);
                                     }
-                                }, 1000);
+                                }, 300);
                             }
                         });
                 }

@@ -63,7 +63,13 @@ class ExHonDashboard {
 
   initializeSocketIO() {
     try {
-      this.socket = io();
+      this.socket = io({
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: 10,
+        transports: ['websocket', 'polling']
+      });
 
       this.socket.on("connect", () => {
         this.isConnected = true;
@@ -76,6 +82,21 @@ class ExHonDashboard {
         this.isConnected = false;
         this.updateConnectionStatus(false);
         this.logActivity("Disconnected from monitoring server", "error");
+      });
+
+      this.socket.on("reconnect", (attemptNumber) => {
+        this.isConnected = true;
+        this.updateConnectionStatus(true);
+        this.logActivity(`Reconnected after ${attemptNumber} attempts`, "success");
+        this.socket.emit("start_monitoring");
+      });
+
+      this.socket.on("reconnect_attempt", () => {
+        this.logActivity("Attempting to reconnect...", "warning");
+      });
+
+      this.socket.on("reconnect_error", (error) => {
+        this.logActivity("Reconnection error", "error");
       });
 
       this.socket.on("initial_data", (data) => {
@@ -631,12 +652,17 @@ class ExHonDashboard {
   }
 
   startPeriodicUpdates() {
-    // Update every 10 seconds
+    // Clear any existing interval
+    if (this.updateInterval) {
+      clearInterval(this.updateInterval);
+    }
+    
+    // Update every 5 seconds for more responsive UI
     this.updateInterval = setInterval(() => {
-      if (this.isConnected) {
+      if (this.isConnected && this.socket && this.socket.connected) {
         this.requestUpdate();
       }
-    }, 10000);
+    }, 5000);
   }
 
   showAlert(message, type = "info") {
